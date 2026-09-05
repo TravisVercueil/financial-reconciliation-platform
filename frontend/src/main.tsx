@@ -1,6 +1,34 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import "./style.css";
+import "@fontsource/ibm-plex-sans/latin-400.css";
+import "@fontsource/ibm-plex-sans/latin-600.css";
+import "@fontsource/ibm-plex-mono/latin-400.css";
+import "./style.scss";
+import {
+  Button,
+  ContentSwitcher,
+  Switch,
+  Table,
+  TableHead,
+  TableRow,
+  TableHeader,
+  TableBody,
+  TableCell,
+  Tag,
+  Select,
+  SelectItem,
+  TextArea,
+  FileUploaderButton,
+  InlineNotification,
+  InlineLoading,
+  Theme,
+  Header,
+  HeaderName,
+  HeaderNavigation,
+  HeaderMenuItem,
+  DataTableSkeleton,
+} from "@carbon/react";
+import { Close, Renew, View } from "@carbon/react/icons";
 import { sandboxRequest } from "./sandbox";
 const sandbox = import.meta.env.VITE_DEMO_MODE === "true";
 import ledger from "../../fixtures/ledger.csv?raw";
@@ -52,6 +80,15 @@ function App() {
     [busy, setBusy] = useState(false),
     [loading, setLoading] = useState(true),
     [source, setSource] = useState("bank");
+  const inspectionTitle = useRef<HTMLHeadingElement>(null);
+  const inspectTrigger = useRef<HTMLButtonElement | null>(null);
+  useEffect(() => {
+    if (selected) inspectionTitle.current?.focus();
+    else if (inspectTrigger.current) {
+      if (inspectTrigger.current.isConnected) inspectTrigger.current.focus();
+      else document.getElementById("main")?.focus();
+    }
+  }, [selected]);
   async function refresh() {
     const [i, h] = await Promise.all([
       api<Item[]>("/report"),
@@ -96,74 +133,121 @@ function App() {
       (filter === "open" && ["unmatched", "ambiguous"].includes(x.status)) ||
       x.status === filter,
   );
+  const filters = [
+    ["all", "All entries"],
+    ["open", "Open"],
+    ["matched", "Matched"],
+    ["reviewed", "Reviewed"],
+  ];
   return (
-    <div className="app">
-      <a className="skip" href="#main">
+    <Theme theme="g10" className="workbench">
+      <Theme theme="g100" className="shell-theme">
+        <Header aria-label="Recon">
+          <HeaderName href="#main" prefix="">
+            Recon
+          </HeaderName>
+          <HeaderNavigation aria-label="Workspace navigation">
+            <HeaderMenuItem href="#main" isCurrentPage>
+              Reconciliation
+            </HeaderMenuItem>
+            <HeaderMenuItem href="#activity">Review history</HeaderMenuItem>
+          </HeaderNavigation>
+        </Header>
+      </Theme>
+      <a className="skip-link" href="#main">
         Skip to workspace
       </a>
-      <aside>
-        <a className="brand" href="#main">
-          <span className="mark">r/</span> recon
-          <span className="brand-dot">.</span>
-        </a>
-        <div className="aside-label">WORKSPACE</div>
-        <a className="nav-active" href="#main">
-          ↔ <span>Reconciliation</span>
-          <span className="count">{open}</span>
-        </a>
-        <a href="#activity">
-          ↳ <span>Review history</span>
-        </a>
-        <div className="aside-bottom">
-          <span className="avatar">TV</span>
-          <div>
-            Travis Vercueil<small>Engineering portfolio</small>
-          </div>
+      <main id="main" tabIndex={-1}>
+        <div className="mode-notice">
+          <InlineNotification
+            kind="info"
+            lowContrast
+            hideCloseButton
+            title={sandbox ? "Interactive sandbox" : "Local demo"}
+            subtitle={
+              sandbox
+                ? "Synthetic data. Changes stay in this browser."
+                : "Synthetic data. Changes are saved by the local backend."
+            }
+          />
         </div>
-      </aside>
-      <div className="content">
-        <header>
+        <div className="page-heading">
+          <h1>Reconciliation</h1>
+          <p>
+            Exact matches require the same account, currency, amount and
+            reference, with one unique counterpart on each side.
+          </p>
+        </div>
+        <dl className="summary" aria-label="Reconciliation summary">
           <div>
-            Operations <span>/</span> Reconciliation
+            <dt>Imported entries</dt>
+            <dd>{items.length}</dd>
           </div>
-          <span className="demo">
-            <i />{" "}
-            {sandbox
-              ? "Interactive sandbox · synthetic data · changes stay in this browser"
-              : "Local demo · synthetic data"}
-          </span>
-        </header>
-        <main id="main">
-          <div className="intro">
-            <div>
-              <p className="eyebrow">FINANCIAL OPERATIONS / 01</p>
-              <h1>
-                Every transaction.
-                <br />
-                <em>Accounted for.</em>
-              </h1>
-              <p className="subtitle">
-                Match the records. Investigate the differences.
-                <br />
-                Keep the decision trail.
-              </p>
-            </div>
-            <div className="intro-note">
-              <span className="live-dot" /> Deterministic matching
-              <p>
-                Account + currency + amount + reference.
-                <br />
-                Only unique counterparts match.
-              </p>
-            </div>
+          <div>
+            <dt>Matched entries</dt>
+            <dd>
+              {matched}
+              <span> / {matched / 2} pairs</span>
+            </dd>
           </div>
-          <div className="toolbar">
-            <div>
-              <h2>Reconciliation workspace</h2>
-              <p>One place to review ledger and bank entries.</p>
-            </div>
-            <button
-              className="primary"
+          <div>
+            <dt>Open exceptions</dt>
+            <dd>{open}</dd>
+          </div>
+          <div>
+            <dt>Reviewed exceptions</dt>
+            <dd>{reviewed}</dd>
+          </div>
+        </dl>
+        {message && (
+          <InlineNotification
+            kind="success"
+            lowContrast
+            hideCloseButton
+            title="Workspace updated"
+            subtitle={message}
+          />
+        )}
+        {error && (
+          <div className="request-error">
+            <InlineNotification
+              kind="error"
+              lowContrast
+              hideCloseButton
+              title="Request failed"
+              subtitle={error}
+            />
+            <Button
+              kind="tertiary"
+              size="sm"
+              onClick={() => run(refresh)}
+              disabled={busy}
+            >
+              Retry connection
+            </Button>
+          </div>
+        )}
+        <section
+          className="entries-section"
+          aria-label="Reconciliation workspace"
+        >
+          <div className="workspace-toolbar">
+            <ContentSwitcher
+              size="md"
+              selectedIndex={filters.findIndex(([value]) => value === filter)}
+              onChange={({ index }) => {
+                if (index !== undefined) setFilter(filters[index][0]);
+              }}
+              aria-label="Filter entries"
+            >
+              {filters.map(([value, label]) => (
+                <Switch key={value} name={value} text={label} />
+              ))}
+            </ContentSwitcher>
+            <Button
+              kind="tertiary"
+              size="md"
+              renderIcon={Renew}
               disabled={busy}
               onClick={() =>
                 run(async () => {
@@ -178,326 +262,352 @@ function App() {
               {busy
                 ? "Working…"
                 : items.length
-                  ? "Replay sample data ↻"
-                  : "Load sample data ↗"}
-            </button>
+                  ? "Replay sample data"
+                  : "Load sample data"}
+            </Button>
           </div>
-          <section className="stats" aria-label="Reconciliation summary">
-            <div>
-              <span>Imported entries</span>
-              <strong>{items.length.toString().padStart(2, "0")}</strong>
-              <small>Both sources combined</small>
-            </div>
-            <div>
-              <span>Matched entries</span>
-              <strong className="green">
-                {matched.toString().padStart(2, "0")}
-              </strong>
-              <small>{matched / 2} unique pairs</small>
-            </div>
-            <div>
-              <span>Open exceptions</span>
-              <strong className="amber">
-                {open.toString().padStart(2, "0")}
-              </strong>
-              <small>Require investigation</small>
-            </div>
-            <div>
-              <span>Reviewed exceptions</span>
-              <strong>{reviewed.toString().padStart(2, "0")}</strong>
-              <small>Reason recorded · no postings</small>
-            </div>
-          </section>
-          <div role="status" className={message ? "notice" : ""}>
-            {message}
-          </div>
-          {error && (
-            <div role="alert" className="error">
-              {error}{" "}
-              <button onClick={() => run(refresh)}>Retry connection</button>
-            </div>
-          )}
-          <section className="records">
-            <div className="table-toolbar">
-              <div className="filters" aria-label="Filter entries">
-                {[
-                  ["all", "All entries"],
-                  ["open", "Open"],
-                  ["matched", "Matched"],
-                  ["reviewed", "Reviewed"],
-                ].map(([value, label]) => (
-                  <button
-                    key={value}
-                    aria-pressed={filter === value}
-                    onClick={() => setFilter(value)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <span>{visible.length} entries</span>
-            </div>
-            {loading ? (
-              <p className="empty">Connecting to the workspace…</p>
-            ) : !visible.length ? (
-              <div className="empty">
-                <h3>
-                  {items.length
-                    ? "No entries in this view."
-                    : "Start with a realistic reconciliation batch."}
-                </h3>
-                <p>
-                  {items.length
-                    ? "Choose another filter to see the other entries."
-                    : "Load sample data to investigate partial payments, a bank fee and ambiguous references."}
-                </p>
-              </div>
-            ) : (
-              <div className="table-scroll">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Reference / entry</th>
-                      <th>Source</th>
-                      <th>Account</th>
-                      <th className="numeric">Amount</th>
-                      <th>Status</th>
-                      <th>
-                        <span className="sr-only">Actions</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {visible.map((item) => (
-                      <tr key={item.entry.source + item.entry.id}>
-                        <td>
-                          <b>{item.entry.reference}</b>
-                          <small>{item.entry.id}</small>
-                        </td>
-                        <td>
-                          <span className="source">{item.entry.source}</span>
-                        </td>
-                        <td className="account">{item.entry.account}</td>
-                        <td className="numeric amount">
-                          {item.entry.currency} {formatMoney(item.entry.amount)}
-                        </td>
-                        <td>
-                          <span className={"status " + item.status}>
-                            <i />
-                            {item.status}
-                          </span>
-                        </td>
-                        <td>
-                          <button
-                            className="text-button"
-                            onClick={() => {
-                              setSelected(item);
-                              setReason("");
-                            }}
-                            aria-label={"Inspect " + item.entry.id}
-                          >
-                            Inspect ↗
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </section>
-          <div className="bottom-grid">
-            <section className="import">
-              <p className="eyebrow">BRING YOUR OWN SYNTHETIC DATA</p>
-              <h2>Import a CSV batch</h2>
-              <p>
-                Atomic imports. Identical replays are skipped. Conflicting IDs
-                reject the entire batch.
-              </p>
-              <div className="import-controls">
-                <label>
-                  Source
-                  <select
-                    value={source}
-                    onChange={(e) => setSource(e.target.value)}
-                    disabled={busy}
-                  >
-                    <option value="bank">Bank statement</option>
-                    <option value="ledger">Ledger entries</option>
-                  </select>
-                </label>
-                <label className="file-label">
-                  Choose CSV
-                  <input
-                    type="file"
-                    accept=".csv,text/csv"
-                    disabled={busy || sandbox}
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      e.target.value = "";
-                      if (f)
-                        run(async () => {
-                          if (f.size > 200000)
-                            throw new Error("CSV must be at most 200 KB.");
-                          const result = await upload(await f.text(), source);
-                          setMessage(
-                            `${result.inserted} entries imported. ${result.duplicates} identical replays skipped.`,
-                          );
-                        });
-                    }}
-                  />
-                </label>
-              </div>
-              <code>id,account,currency,amount,reference</code>
-              <p className="fine">
-                {sandbox
-                  ? "Custom CSV imports require the locally running Java backend. This sandbox uses predefined sample cases. "
-                  : ""}
-                Up to 1,000 rows · ZAR, USD, EUR, GBP · two decimal places
-              </p>
-            </section>
-            <section id="activity" className="activity">
-              <p className="eyebrow">DECISIONS, WITH CONTEXT</p>
-              <h2>
-                Review history <span>{history.length}</span>
-              </h2>
-              {!history.length ? (
-                <p>
-                  No reviews yet. Inspect an open exception and record your
-                  investigation.
-                </p>
-              ) : (
-                <ol>
-                  {history.map((h) => (
-                    <li key={h.source + h.id}>
-                      <b>
-                        {h.id} <span>{h.source}</span>
-                      </b>
-                      <p>{h.reason}</p>
-                      <small>
-                        {h.actor} · {new Date(h.at).toLocaleString()}
-                      </small>
-                    </li>
-                  ))}
-                </ol>
-              )}
-            </section>
-          </div>
-          <footer>
-            Built by Travis Vercueil{" "}
-            <span>Java / Spring Boot / React / PostgreSQL</span>
-          </footer>
-        </main>
-      </div>
-      {selected && (
-        <div
-          className="modal-backdrop"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setSelected(null);
-          }}
-        >
-          <dialog
-            open
-            aria-labelledby="review-title"
-            onKeyDown={(e) => {
-              if (e.key === "Escape") setSelected(null);
-              if (e.key === "Tab") {
-                const nodes = Array.from(
-                  e.currentTarget.querySelectorAll<HTMLElement>(
-                    "button,textarea",
-                  ),
-                ).filter((n) => !(n as HTMLButtonElement).disabled);
-                const first = nodes[0],
-                  last = nodes[nodes.length - 1];
-                if (e.shiftKey && document.activeElement === first) {
-                  e.preventDefault();
-                  last.focus();
-                } else if (!e.shiftKey && document.activeElement === last) {
-                  e.preventDefault();
-                  first.focus();
-                }
-              }
-            }}
+          <div
+            className={
+              selected ? "workspace-grid has-inspection" : "workspace-grid"
+            }
           >
-            <button
-              className="close"
-              autoFocus
-              onClick={() => setSelected(null)}
-              aria-label="Close inspection"
-            >
-              ×
-            </button>
-            <p className="eyebrow">EXCEPTION INSPECTION</p>
-            <h2 id="review-title">{selected.entry.reference}</h2>
-            <p>
-              {selected.entry.id} · {selected.entry.source} ·{" "}
-              {selected.entry.currency} {selected.entry.amount}
-            </p>
-            <div className="explanation">
-              <b>Matching evidence</b>
-              <p>{selected.explanation}</p>
-              <small>Rule-based explanation · no AI model involved</small>
+            <div className="ledger-area">
+              {loading ? (
+                <DataTableSkeleton
+                  columnCount={7}
+                  rowCount={6}
+                  showHeader={false}
+                  showToolbar={false}
+                />
+              ) : !visible.length ? (
+                <div className="empty-state">
+                  <h2>
+                    {items.length
+                      ? "No entries in this view."
+                      : "No imported entries"}
+                  </h2>
+                  <p>
+                    {items.length
+                      ? "Choose another filter to see the other entries."
+                      : "Load sample data to investigate partial payments, a bank fee and ambiguous references."}
+                  </p>
+                </div>
+              ) : (
+                <div
+                  className="table-scroll"
+                  tabIndex={0}
+                  role="region"
+                  aria-label="Reconciliation entries; scroll horizontally for all columns"
+                >
+                  <Table
+                    size="md"
+
+                    aria-label="Reconciliation entries"
+                  >
+                    <TableHead>
+                      <TableRow>
+                        <TableHeader>Reference</TableHeader>
+                        <TableHeader>Entry</TableHeader>
+                        <TableHeader>Source</TableHeader>
+                        <TableHeader>Account</TableHeader>
+                        <TableHeader className="numeric">Amount</TableHeader>
+                        <TableHeader>Status</TableHeader>
+                        <TableHeader>Action</TableHeader>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {visible.map((item) => (
+                        <TableRow
+                          key={item.entry.source + item.entry.id}
+                          className={
+                            selected?.entry.source === item.entry.source &&
+                            selected?.entry.id === item.entry.id
+                              ? "inspected-row"
+                              : undefined
+                          }
+                        >
+                          <TableCell>{item.entry.reference}</TableCell>
+                          <TableCell className="identifier">
+                            {item.entry.id}
+                          </TableCell>
+                          <TableCell>{item.entry.source}</TableCell>
+                          <TableCell className="identifier">
+                            {item.entry.account}
+                          </TableCell>
+                          <TableCell className="numeric amount">
+                            {item.entry.currency}{" "}
+                            {formatMoney(item.entry.amount)}
+                          </TableCell>
+                          <TableCell>
+                            <Tag
+                              size="sm"
+                              type={
+                                item.status === "matched"
+                                  ? "green"
+                                  : item.status === "reviewed"
+                                    ? "blue"
+                                    : item.status === "ambiguous"
+                                      ? "warm-gray"
+                                      : "cool-gray"
+                              }
+                            >
+                              {item.status}
+                            </Tag>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              kind="ghost"
+                              size="sm"
+                              renderIcon={View}
+                              aria-label={"Inspect " + item.entry.id}
+                              onClick={(event) => {
+                                inspectTrigger.current = event.currentTarget;
+                                setSelected(item);
+                                setReason("");
+                              }}
+                            >
+                              Inspect
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+              <div className="table-count">
+                {visible.length} entries in this view
+              </div>
             </div>
-            {selected.reason && (
-              <p>
-                <b>Review reason:</b> {selected.reason}
-              </p>
+            {selected && (
+              <section
+                className="inspection"
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") setSelected(null);
+                }}
+                aria-labelledby="inspection-title"
+              >
+                <div className="inspection-heading">
+                  <h2 id="inspection-title" ref={inspectionTitle} tabIndex={-1}>
+                    {selected.entry.reference}
+                  </h2>
+                  <Button
+                    kind="ghost"
+                    size="sm"
+                    hasIconOnly
+                    iconDescription="Close inspection"
+                    renderIcon={Close}
+                    onClick={() => setSelected(null)}
+                  />
+                </div>
+                <dl className="entry-detail">
+                  <dt>Entry</dt>
+                  <dd>{selected.entry.id}</dd>
+                  <dt>Source</dt>
+                  <dd>{selected.entry.source}</dd>
+                  <dt>Account</dt>
+                  <dd>{selected.entry.account}</dd>
+                  <dt>Currency</dt>
+                  <dd>{selected.entry.currency}</dd>
+                  <dt>Amount</dt>
+                  <dd className="amount">
+                    {formatMoney(selected.entry.amount)}
+                  </dd>
+                  <dt>Status</dt>
+                  <dd>{selected.status}</dd>
+                </dl>
+                <div className="matching-evidence">
+                  <h3>Matching evidence</h3>
+                  <p>{selected.explanation}</p>
+                  <p className="helper">
+                    Rule-based explanation. No AI model involved.
+                  </p>
+                </div>
+                {selected.reason && (
+                  <div className="saved-review">
+                    <h3>Review reason</h3>
+                    <p>{selected.reason}</p>
+                  </div>
+                )}
+                {["unmatched", "ambiguous"].includes(selected.status) ? (
+                  <form
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      run(async () => {
+                        await api("/resolutions", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            source: selected.entry.source,
+                            id: selected.entry.id,
+                            reason,
+                          }),
+                        });
+                        setSelected(null);
+                        setMessage(
+                          "Exception reviewed. Reason saved to history. No financial posting was created.",
+                        );
+                      });
+                    }}
+                  >
+                    <TextArea
+                      id="reason"
+                      name="reason"
+                      autoComplete="off"
+                      labelText="Investigation / resolution reason"
+                      required
+                      minLength={10}
+                      maxLength={1000}
+                      rows={4}
+                      value={reason}
+                      onChange={(event) => setReason(event.target.value)}
+                      placeholder="What did you verify, and what happens next?"
+                      helperText="10 to 1,000 characters. Record the evidence and next step."
+                    />
+                    <p className="helper review-boundary">
+                      Reviewing acknowledges this exception. It does not match
+                      entries or move money.
+                    </p>
+                    {error && (
+                      <InlineNotification
+                        kind="error"
+                        lowContrast
+                        hideCloseButton
+                        title="Review not saved"
+                        subtitle={error}
+                      />
+                    )}
+                    <Button type="submit" size="md" disabled={busy}>
+                      {busy ? "Saving…" : "Record review"}
+                    </Button>
+                  </form>
+                ) : (
+                  <Button
+                    kind="tertiary"
+                    size="md"
+                    onClick={() => setSelected(null)}
+                  >
+                    Close inspection
+                  </Button>
+                )}
+              </section>
             )}
-            {["unmatched", "ambiguous"].includes(selected.status) ? (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
+          </div>
+        </section>
+        <section className="import-section" aria-labelledby="import-heading">
+          <div>
+            <h2 id="import-heading">Import a CSV batch</h2>
+            <p>
+              Identical replays are skipped. Conflicting IDs reject the entire
+              batch.
+            </p>
+          </div>
+          <div className="import-controls">
+            <Select
+              id="import-source"
+              name="source"
+              labelText="Source"
+              value={source}
+              onChange={(event) => setSource(event.target.value)}
+              disabled={busy}
+              size="md"
+            >
+              <SelectItem value="bank" text="Bank statement" />
+              <SelectItem value="ledger" text="Ledger entries" />
+            </Select>
+            <FileUploaderButton
+              name="csv"
+              labelText="Choose CSV"
+              accept={[".csv", "text/csv"]}
+              disabled={busy || sandbox}
+              size="md"
+              buttonKind="primary"
+              disableLabelChanges
+              onChange={(event) => {
+                const f = event.target.files?.[0];
+                event.target.value = "";
+                if (f)
                   run(async () => {
-                    await api("/resolutions", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        source: selected.entry.source,
-                        id: selected.entry.id,
-                        reason,
-                      }),
-                    });
-                    setSelected(null);
+                    if (f.size > 200000)
+                      throw new Error("CSV must be at most 200 KB.");
+                    const result = await upload(await f.text(), source);
                     setMessage(
-                      "Exception reviewed. Reason saved to history. No financial posting was created.",
+                      `${result.inserted} entries imported. ${result.duplicates} identical replays skipped.`,
                     );
                   });
-                }}
-              >
-                <label htmlFor="reason">
-                  Investigation / resolution reason
-                </label>
-                <textarea
-                  id="reason"
-                  required
-                  minLength={10}
-                  maxLength={1000}
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="What did you verify, and what happens next?"
-                />
-                <p className="fine">
-                  Reviewing acknowledges this exception. It does not match
-                  entries or move money.
-                </p>
-                {error && (
-                  <p role="alert" className="error">
-                    {error}
-                  </p>
-                )}
-                <button className="primary" disabled={busy}>
-                  {busy ? "Saving…" : "Record review"}
-                </button>
-              </form>
-            ) : (
-              <button onClick={() => setSelected(null)}>
-                Close inspection
-              </button>
-            )}
-          </dialog>
-        </div>
-      )}
-    </div>
+              }}
+            />
+          </div>
+          <p className="csv-contract">
+            <code>id,account,currency,amount,reference</code>
+            <span>
+              Up to 1,000 rows. ZAR, USD, EUR, GBP. Two decimal places.
+            </span>
+          </p>
+          {sandbox && (
+            <p className="helper">
+              Custom CSV imports require the locally running Java backend. This
+              sandbox uses predefined sample cases.
+            </p>
+          )}
+        </section>
+        <section
+          id="activity"
+          className="history-section"
+          aria-labelledby="history-heading"
+        >
+          <div className="section-heading">
+            <h2 id="history-heading">Review history</h2>
+            <span>
+              {history.length} recorded{" "}
+              {history.length === 1 ? "review" : "reviews"}
+            </span>
+          </div>
+          {!history.length ? (
+            <p className="history-empty">
+              No reviews yet. Inspect an open exception and record your
+              investigation.
+            </p>
+          ) : (
+            <div
+              className="table-scroll"
+              tabIndex={0}
+              role="region"
+              aria-label="Review history; scroll horizontally for all columns"
+            >
+              <Table size="md" aria-label="Review history">
+                <TableHead>
+                  <TableRow>
+                    <TableHeader>Entry</TableHeader>
+                    <TableHeader>Source</TableHeader>
+                    <TableHeader>Reviewed by</TableHeader>
+                    <TableHeader>Reviewed on</TableHeader>
+                    <TableHeader>Reason</TableHeader>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {history.map((h) => (
+                    <TableRow key={h.source + h.id}>
+                      <TableCell className="identifier">{h.id}</TableCell>
+                      <TableCell>{h.source}</TableCell>
+                      <TableCell>{h.actor}</TableCell>
+                      <TableCell>{new Date(h.at).toLocaleString()}</TableCell>
+                      <TableCell className="review-text">{h.reason}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </section>
+        {busy && (
+          <InlineLoading
+            description="Updating workspace…"
+            className="request-progress"
+          />
+        )}
+      </main>
+    </Theme>
   );
 }
 createRoot(document.getElementById("root")!).render(<App />);
