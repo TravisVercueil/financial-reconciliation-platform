@@ -319,6 +319,7 @@ h2 {
   color: #7b8aa1;
 }
 .table-scroll {
+  position: relative;
   overflow: auto;
 }
 table {
@@ -539,6 +540,7 @@ footer {
   background: #101d3699;
   display: grid;
   place-items: center;
+  grid-template-columns: minmax(0, 1fr);
   z-index: 5;
   padding: 18px;
 }
