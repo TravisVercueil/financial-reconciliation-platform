@@ -1,0 +1,12 @@
+{
+  "name": "financial-reconciliation-platform",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.ts",
+    "demo": "node examples/demo.ts"
+  }
+}
