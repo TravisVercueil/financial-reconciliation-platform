@@ -2,6 +2,8 @@
 
 A full-stack portfolio application by Travis Vercueil. Import ledger and bank CSVs, identify exact one-to-one matches, investigate exceptions, and record review reasons. All sample information is synthetic. This application does **not** move money or post accounting adjustments.
 
+**[Open the live sandbox →](https://financial-reconciliation-platform.vercel.app)** — explore synthetic bank/ledger cases and save reviews in your browser. No backend or AI calls run in this demo; custom CSV imports and database persistence are available in the full local application below.
+
 The interface uses a navy/blue financial workspace with compact tabular typography and white/slate surfaces.
 
 ## Why this project
