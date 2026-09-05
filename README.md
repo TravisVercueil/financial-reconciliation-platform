@@ -2,6 +2,8 @@
 
 A full-stack portfolio application by Travis Vercueil. Import ledger and bank CSVs, identify exact one-to-one matches, investigate exceptions, and record review reasons. All sample information is synthetic. This application does **not** move money or post accounting adjustments.
 
+The interface uses a navy/blue financial workspace with compact tabular typography and white/slate surfaces.
+
 ## Why this project
 
 Recon makes correctness visible: financial values use Java `BigDecimal` and database `DECIMAL`, every match stays within an account and currency, ambiguous candidates remain open, and a conflicting duplicate rejects its entire import. An operator review records a reason without pretending the discrepancy has financially disappeared.
