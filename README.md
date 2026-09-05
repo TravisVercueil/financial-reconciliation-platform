@@ -4,7 +4,7 @@ A full-stack portfolio application by Travis Vercueil. Import ledger and bank CS
 
 **[Open the live sandbox →](https://financial-reconciliation-platform.vercel.app)** — explore synthetic bank/ledger cases and save reviews in your browser. No backend or AI calls run in this demo; custom CSV imports and database persistence are available in the full local application below.
 
-The interface uses a navy/blue financial workspace with compact tabular typography and white/slate surfaces.
+The interface uses official IBM Carbon React components: a compact reconciliation table, inline evidence inspection and a recorded review history. See [DESIGN.md](DESIGN.md) for the design reference, component choices and preservation audit.
 
 ## Why this project
 
